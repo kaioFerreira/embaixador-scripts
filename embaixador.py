@@ -39,12 +39,12 @@ def login_and_navigate_to_grid(driver):
     )
     element2.click()
 
-    element3 = WebDriverWait(driver, 20).until(
-        EC.element_to_be_clickable((By.XPATH, '//*[@id="sideBarNames"]/li[2]/a'))
-    )
-    element3.click()
+    # element3 = WebDriverWait(driver, 60).until(
+    #     EC.element_to_be_clickable((By.XPATH, '//*[@id="sideBarNames"]/li[3]/a'))
+    # )
+    # element3.click()
 
-    element4 = WebDriverWait(driver, 20).until(
+    element4 = WebDriverWait(driver, 60).until(
         EC.element_to_be_clickable((By.XPATH, '//*[@id="root"]/div/div/div/section[2]/div/div[2]/table/tbody/tr/td[1]/a'))
     )
     element4.click()
@@ -53,13 +53,19 @@ def login_and_navigate_to_grid(driver):
         EC.element_to_be_clickable((By.XPATH, '//*[@id=":ru:-tab-1"]'))
     )
     element5.click()
-
-    # Aguarda a grid estar presente
-    grid_container = WebDriverWait(driver, 20).until(
-        EC.presence_of_element_located((By.XPATH, '//*[@id=":ru:-tabpanel-1"]/div/section/div'))
+    
+    element5 = WebDriverWait(driver, 20).until(
+        EC.element_to_be_clickable((By.XPATH, '//*[@id=":ru:-tabpanel-1"]/div/section/details[1]/summary'))
     )
+    element5.click()
 
-    return grid_container
+    # Localiza a div principal (ajuste o XPath conforme necessário)
+    div_principal = driver.find_element(By.XPATH, '//*[@id=":ru:-tabpanel-1"]/div/section/details[1]/div')
+
+    # Encontra todas as divs internas que contêm os dados
+    divs_dados = div_principal.find_elements(By.CLASS_NAME, 'bg-gray-50')
+
+    return divs_dados
 
 def extract_grid_data():
     """
@@ -73,36 +79,37 @@ def extract_grid_data():
     service = Service("./chromedriver")
     driver = webdriver.Chrome(service=service)
 
-    grid_container = login_and_navigate_to_grid(driver)
+    grid_dados = login_and_navigate_to_grid(driver)
 
-    # Rola a grid para carregar todos os blocos
-    previous_count = 0
-    while True:
-        blocks = grid_container.find_elements(By.XPATH, "./div")
-        current_count = len(blocks)
-        if current_count > previous_count:
-            previous_count = current_count
-            # Rola até o último bloco para carregar os próximos
-            driver.execute_script("arguments[0].scrollIntoView(true);", blocks[-1])
-            time.sleep(1)
-        else:
-            break
-
-    # Re-obtem os blocos após a rolagem completa
-    blocks = grid_container.find_elements(By.XPATH, "./div")
+    # Lista para armazenar os dados
     dados = []
+    count = 1
+    # Loop para extrair Cliente, Veículo e Data
+    for div in grid_dados:
+        textos = div.text.split("\n")
+        cliente = ""
+        veiculo = ""
+        data = ""
+        
+        for linha in textos:
+            if linha.startswith("Cliente:"):
+                cliente = linha.replace("Cliente:", "").strip()
+            elif linha.startswith("Veículo:"):
+                veiculo = linha.replace("Veículo:", "").strip()
+            elif linha.startswith("Data:"):
+                data = linha.replace("Data:", "").strip()
+        print("\n✅ Cliente", count)
+        print(cliente)
+        print(veiculo)
+        print(data)
 
-    for index, block in enumerate(blocks, start=1):
-        labels = block.find_elements(By.TAG_NAME, "label")
-        if len(labels) >= 8:
-            cliente = labels[1].text.strip()
-            veiculo = labels[5].text.strip()
-            data = labels[7].text.strip()
-            dados.append({"Cliente": cliente, "Veículo": veiculo, "Data": data})
-            print(f"[Bloco {index}] Cliente: {cliente} | Veículo: {veiculo} | Data: {data}")
-        else:
-            print(f"[Bloco {index}] Estrutura inesperada: {block.text}")
-
+        count += 1
+        dados.append({
+            "Cliente": cliente,
+            "Veículo": veiculo,
+            "Data": data
+        })
+        
     # Gera o nome do arquivo com a data atual
     today_str = datetime.now().strftime("%d-%m-%Y")
     filename = f"dados_{today_str}.xlsx"
@@ -142,7 +149,7 @@ def verify_clients_in_site(excel_file=None):
         else:
             break
 
-    blocks = grid_container.find_elements(By.XPATH, "./div")
+    blocks = grid_container.find_elements(By.XPATH, "./p")
     site_clients = []
     for block in blocks:
         labels = block.find_elements(By.TAG_NAME, "label")
